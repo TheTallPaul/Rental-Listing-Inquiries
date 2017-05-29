@@ -8,6 +8,8 @@ from sklearn import model_selection, preprocessing
 from sklearn.metrics import log_loss
 from sklearn.feature_extraction.text import CountVectorizer
 
+from district import district
+
 # Reads the json object as a panda object
 def read_data(train_filepath, test_filepath):
     return pd.read_json(train_filepath), pd.read_json(test_filepath)
@@ -25,11 +27,17 @@ def remove_unused_features(train_data, test_data, features_used):
 
 def add_features(train_data, test_data):
     features = ['price', 'bedrooms', 'bathrooms', 'num_photos', 'manager_id', 
-                'building_id']
+                'building_id', 'school_district_id']
     
     # The number of photos
     train_data['num_photos'] = train_data['photos'].apply(len)
     test_data['num_photos'] = test_data['photos'].apply(len)
+    
+    # School district id
+    train_data['school_district_id'] = train_data.apply(lambda x: district(
+            x['latitude'], x['longitude']), axis=1)
+    test_data['school_district_id'] = test_data.apply(lambda x: district(
+            x['latitude'], x['longitude']), axis=1)
     
     remove_unused_features(train_data, test_data, features)
 
@@ -48,15 +56,22 @@ def interest_level_to_int(interest_level):
 def create_label(train_data):
     return np.array(train_data['interest_level'].apply(interest_level_to_int))
 
+def remove_interest_col(train_data):
+    interest_levels = ['high', 'medium', 'low']
+    
+    for col in range(len(train_data[0])):
+        if train_data[0][col] in interest_levels:
+            return np.delete(train_data, col, 1)
+
 def prepare_data(train_data):
     train_data = train_data.as_matrix()
-    train_data = np.delete(train_data, [2], 1)
-
-    for f in range(len(train_data[0])): 
-        if train_data[f].dtype=='object': 
-            lbl = preprocessing.LabelEncoder() 
-            lbl.fit(train_data[f]) 
-            train_data[f] = lbl.transform(train_data[f])
+    train_data = remove_interest_col(train_data)
+    
+    for feature in range(len(train_data[0])):
+        if train_data[feature].dtype=='object':
+            lbl = preprocessing.LabelEncoder()
+            lbl.fit(train_data[feature])
+            train_data[feature] = lbl.transform(train_data[feature])
             
 
 
@@ -65,6 +80,9 @@ train_data, test_data = read_data('train.json', 'test.json')
 add_features(train_data, test_data)
 
 train_y = create_label(train_data)
+
+prepare_data(train_data)
+
 
 # train = xgb.DMatrix(train_data, label=train_y)
 # train.save_binary('train.buffer')
