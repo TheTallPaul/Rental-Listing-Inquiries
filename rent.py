@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import pandas as pd
+
 from scipy import sparse
 import xgboost as xgb
 from sklearn import model_selection, preprocessing
@@ -11,6 +12,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 # Reads the json object as a panda object
 def read_data(train_filepath, test_filepath):
     return pd.read_json(train_filepath), pd.read_json(test_filepath)
+    
 
 # Removes unwanted features from the pandas object
 def remove_unused_features(train_data, test_data, features_used):
@@ -29,7 +31,9 @@ def add_features(train_data, test_data):
     
     # The number of photos
     train_data['num_photos'] = train_data['photos'].apply(len)
+    train_data['price_per_sqft'] = (train_data['price']/(1 + train_data['bedrooms'].clip(1,4) + 0.5*train_data['bathrooms'].clip(0,2)))
     test_data['num_photos'] = test_data['photos'].apply(len)
+    test_data['price_per_sqft'] = (test_data['price']/(1 + test_data['bedrooms'].clip(1,4) + 0.5*test_data['bathrooms'].clip(0,2)))
     
     remove_unused_features(train_data, test_data, features)
 
@@ -59,8 +63,7 @@ def prepare_data(train_data):
             train_data[f] = lbl.transform(train_data[f])
             
 
-
-train_data, test_data = read_data('train.json', 'test.json')
+train_data, test_data = read_data('train.json', 'train.json')
 
 add_features(train_data, test_data)
 
