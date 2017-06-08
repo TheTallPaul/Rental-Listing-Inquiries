@@ -31,7 +31,8 @@ def remove_unused_features(train_data, test_data, features_used):
 
 def add_features(train_data, test_data):
     features = ['price', 'bedrooms', 'bathrooms', 'num_photos',
-                'price_per_sqft', 'manager_id']#'school_district_id']
+                'price_per_sqft', 'manager_id', 'building_id', 
+                'display_address', 'street_address']#'school_district_id']
     
     # The number of photos
     train_data['num_photos'] = train_data['photos'].apply(len)
@@ -53,6 +54,7 @@ def add_features(train_data, test_data):
            # x['latitude'], x['longitude']), axis=1)
     
     remove_unused_features(train_data, test_data, features)
+    return features
 
 # Converts the interest level into integers
 def interest_level_to_int(interest_level):
@@ -77,25 +79,25 @@ def remove_interest_col(train_data):
             return np.delete(train_data, col, 1)
 
 def prepare_data(train_data, test_data, features):
-    train_data = train_data.as_matrix()
-    test_data = test_data.as_matrix()
-
-    train_data = remove_interest_col(train_data)
-
     print(features)
 
     for feature in features:
         if train_data[feature].dtype=='object':
+            print(feature)
             lbl = preprocessing.LabelEncoder()
-            lbl.fit(list(train_data[feature].values))
+            lbl.fit(list(train_data[feature].values) + list(test_data[feature].values))
             train_data[feature] = lbl.transform(list(train_data[feature].values))
 
     for feature in features:
         if test_data[feature].dtype=='object':
             lbl = preprocessing.LabelEncoder()
-            lbl.fit(test_data[feature].values)
+            lbl.fit(list(train_data[feature].values) + list(test_data[feature].values))
             test_data[feature] = lbl.transform(list(test_data[feature].values))
   
+    train_data = train_data.as_matrix()
+    test_data = test_data.as_matrix()
+
+    train_data = remove_interest_col(train_data)
     return train_data, test_data
             
 
@@ -120,12 +122,9 @@ boost.dump_model('dump.raw.txt')
 
 print("Training Complete")
 
-
 test = xgb.DMatrix(test_data)
 
 ypred = boost.predict(test)
-
-print(len(ypred))
 
 train_data, test_data = read_data('train.json', 'test.json')
 
