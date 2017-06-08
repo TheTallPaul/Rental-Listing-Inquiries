@@ -2,14 +2,9 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import pandas as pd
-
-from scipy import sparse
 import xgboost as xgb
-from sklearn import model_selection, preprocessing
-from sklearn.metrics import log_loss
-from sklearn.feature_extraction.text import CountVectorizer
 
-from district import district
+from sklearn import preprocessing
 
 # Reads the json object as a panda object
 def read_data(train_filepath, test_filepath):
@@ -25,24 +20,37 @@ def remove_unused_features(train_data, test_data, features_used):
     for feature in features:
         if feature not in features_used and feature != 'interest_level':
             train_data.drop(feature, axis=1, inplace=True)
+    
+    # List of all features
+    features = list(test_data)
+    
+    # Iterate through all features, removing the uneeded ones
+    for feature in features:
+        if feature not in features_used and feature != 'interest_level':
             test_data.drop(feature, axis=1, inplace=True)
 
 def add_features(train_data, test_data):
-    features = ['price', 'bedrooms', 'bathrooms', 'num_photos', 'manager_id', 
-                'building_id', 'school_district_id']
+    features = ['price', 'bedrooms', 'bathrooms', 'num_photos',
+                'price_per_sqft', 'manager_id']#'school_district_id']
     
     # The number of photos
     train_data['num_photos'] = train_data['photos'].apply(len)
-    #price per sqft equation based on Darnell's breakdown: https://www.kaggle.com/arnaldcat/a-proxy-for-sqft-and-the-interest-on-1-2-baths
-    train_data['price_per_sqft'] = (train_data['price']/(1 + train_data['bedrooms'].clip(1,4) + 0.5*train_data['bathrooms'].clip(0,2)))
     test_data['num_photos'] = test_data['photos'].apply(len)
-    test_data['price_per_sqft'] = (test_data['price']/(1 + test_data['bedrooms'].clip(1,4) + 0.5*test_data['bathrooms'].clip(0,2)))
+
+    #price per sqft equation based on Darnell's breakdown: 
+    # www.kaggle.com/arnaldcat/a-proxy-for-sqft-and-the-interest-on-1-2-baths
+    train_data['price_per_sqft'] = train_data['price'] / (1 \
+              + train_data['bedrooms'].clip(1,4) \
+              + 0.5 * train_data['bathrooms'].clip(0,2))
+    test_data['price_per_sqft'] = test_data['price'] / (1 \
+             + test_data['bedrooms'].clip(1,4) \
+             + 0.5 * test_data['bathrooms'].clip(0,2))
     
     # School district id
-    train_data['school_district_id'] = train_data.apply(lambda x: district(
-            x['latitude'], x['longitude']), axis=1)
-    test_data['school_district_id'] = test_data.apply(lambda x: district(
-            x['latitude'], x['longitude']), axis=1)
+    #train_data['school_district_id'] = train_data.apply(lambda x: district(
+           # x['latitude'], x['longitude']), axis=1)
+    #test_data['school_district_id'] = test_data.apply(lambda x: district(
+           # x['latitude'], x['longitude']), axis=1)
     
     remove_unused_features(train_data, test_data, features)
 
@@ -68,25 +76,61 @@ def remove_interest_col(train_data):
         if train_data[0][col] in interest_levels:
             return np.delete(train_data, col, 1)
 
-def prepare_data(train_data):
+def prepare_data(train_data, test_data, features):
     train_data = train_data.as_matrix()
+    test_data = test_data.as_matrix()
+
     train_data = remove_interest_col(train_data)
-    
-    for feature in range(len(train_data[0])):
+
+    print(features)
+
+    for feature in features:
         if train_data[feature].dtype=='object':
             lbl = preprocessing.LabelEncoder()
-            lbl.fit(train_data[feature])
-            train_data[feature] = lbl.transform(train_data[feature])
+            lbl.fit(list(train_data[feature].values))
+            train_data[feature] = lbl.transform(list(train_data[feature].values))
+
+    for feature in features:
+        if test_data[feature].dtype=='object':
+            lbl = preprocessing.LabelEncoder()
+            lbl.fit(test_data[feature].values)
+            test_data[feature] = lbl.transform(list(test_data[feature].values))
+  
+    return train_data, test_data
             
 
-train_data, test_data = read_data('train.json', 'train.json')
+train_data, test_data = read_data('train.json', 'test.json')
 
-add_features(train_data, test_data)
+features = add_features(train_data, test_data)
 
 train_y = create_label(train_data)
 
-prepare_data(train_data)
+train_data, test_data = prepare_data(train_data, test_data, features)
+
+train = xgb.DMatrix(train_data, label=train_y)
+
+params = {}
+params['objective'] = 'multi:softprob'
+params['num_class'] = 3
+params['eval_metric'] = 'mlogloss'
+
+boost = xgb.train(params, train)
+
+boost.dump_model('dump.raw.txt')
+
+print("Training Complete")
 
 
-# train = xgb.DMatrix(train_data, label=train_y)
-# train.save_binary('train.buffer')
+test = xgb.DMatrix(test_data)
+
+ypred = boost.predict(test)
+
+print(len(ypred))
+
+train_data, test_data = read_data('train.json', 'test.json')
+
+out_df = pd.DataFrame(ypred)
+out_df.columns = ["high", "medium", "low"]
+out_df["listing_id"] = test_data.listing_id.values
+out_df.to_csv("coolbros.csv", index=False)
+
