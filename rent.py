@@ -25,9 +25,35 @@ def dist(file):
 		district[buildID] = schoolID
 	return district
 	
+def parseCount(file):
+	f = open(file,"r")
+	dict = {}
+	for line in f:
+		id = ""
+		count = ""
+		control = False
+		for i in range (len(line)):
+			if control == True:
+				count += line[i]
+			if line[i] != "," and control == False:
+				id += line[i]
+			else:
+				control = True
+		dict[id] = int(count)
+	return dict
+
+trainWordCount = parseCount("wordCountTraining.csv")
+testWordCount = parseCount("wordCountTesting.csv")
+
 trainDist = dist("schoolDistricts.csv")
 testDist = dist("schoolDistrictsTest.csv")
 
+def keyToWordCountTest(key):
+	return testWordCount[key]
+
+def keyToWordCountTrain(key):
+	return trainWordCount[key]
+	
 def keyToDictTrain(key):
 	return str(trainDist[key])
 
@@ -60,7 +86,7 @@ def remove_unused_features(train_data, test_data, features_used):
 def add_features(train_data, test_data):
     features = ['price', 'bedrooms', 'bathrooms', 'num_photos',
                 'price_per_sqft', 'manager_id', 'building_id', 'num_features',
-                'latitude', 'longitude', 'school_district_id']
+                'latitude', 'longitude', 'school_district_id', 'description_word_count']
     
     # The number of photos
     train_data['num_photos'] = train_data['photos'].apply(len)
@@ -78,12 +104,15 @@ def add_features(train_data, test_data):
     # Number of Features
     train_data['num_features'] = train_data['features'].apply(len)
     test_data['num_features'] = test_data['features'].apply(len)
-    
 	
     # School district id
     train_data['school_district_id'] = train_data['building_id'].apply(keyToDictTrain)
     test_data['school_district_id'] = test_data['building_id'].apply(keyToDictTest)
-    
+	
+	#description word counts
+    train_data['description_word_count'] = train_data['building_id'].apply(keyToWordCountTrain)
+    test_data['description_word_count'] = test_data['building_id'].apply(keyToWordCountTest)
+	
     remove_unused_features(train_data, test_data, features)
     return features
 
