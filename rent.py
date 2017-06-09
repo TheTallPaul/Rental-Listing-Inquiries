@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 
-from sklearn import preprocessing
+from sklearn import preprocessing, metrics
 
 # Reads the json object as a panda object
 def read_data(train_filepath, test_filepath):
@@ -130,9 +130,13 @@ test = xgb.DMatrix(test_data)
 
 ypred_train = boost.predict(train)
 
+
 ypred = boost.predict(test)
 
 train_data, test_data = read_data('train.json', 'test.json')
+
+print(metrics.log_loss(train_y, ypred_train, labels=[0, 1, 2]))
+
 
 out_df = pd.DataFrame(ypred)
 out_df.columns = ["high", "medium", "low"]
