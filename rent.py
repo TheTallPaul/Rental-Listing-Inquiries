@@ -16,7 +16,7 @@ def dist(file):
 		buildID = ""
 		schoolID = ""
 		for i in range (len(line)):
-			if control == 1:
+			if control == 1 and line[i] != ",":
 				buildID += line[i]
 			if control == 2 and line[i] != "\n":
 				schoolID += line[i]
@@ -29,9 +29,10 @@ trainDist = dist("schoolDistricts.csv")
 testDist = dist("schoolDistrictsTest.csv")
 
 def keyToDictTrain(key):
-	return trainDist[key]
+	return str(trainDist[key])
+
 def keyToDictTest(key):
-	return testDist[key]
+	return str(testDist[key])
 	
 # Reads the json object as a panda object
 def read_data(train_filepath, test_filepath):
@@ -59,7 +60,7 @@ def remove_unused_features(train_data, test_data, features_used):
 def add_features(train_data, test_data):
     features = ['price', 'bedrooms', 'bathrooms', 'num_photos',
                 'price_per_sqft', 'manager_id', 'building_id', 'num_features',
-                'latitude', 'longitude']#'school_district_id']
+                'latitude', 'longitude', 'school_district_id']
     
     # The number of photos
     train_data['num_photos'] = train_data['photos'].apply(len)
@@ -80,8 +81,8 @@ def add_features(train_data, test_data):
     
 	
     # School district id
-    train_data['school_district_id'] = train_data['building_id'].apply(trainDist)
-    test_data['school_district_id'] = test_data['building_id'].apply(testDist)
+    train_data['school_district_id'] = train_data['building_id'].apply(keyToDictTrain)
+    test_data['school_district_id'] = test_data['building_id'].apply(keyToDictTest)
     
     remove_unused_features(train_data, test_data, features)
     return features
@@ -142,9 +143,10 @@ train_data, test_data = prepare_data(train_data, test_data, features)
 train = xgb.DMatrix(train_data, label=train_y)
 
 params = {}
-params['objective'] = 'multi:softprob'
-params['num_class'] = 3
+params['objective']   = 'multi:softprob'
+params['num_class']   = 3
 params['eval_metric'] = 'mlogloss'
+params['eta']         = 0.5
 
 boost = xgb.train(params, train)
 
