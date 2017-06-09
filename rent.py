@@ -31,8 +31,8 @@ def remove_unused_features(train_data, test_data, features_used):
 
 def add_features(train_data, test_data):
     features = ['price', 'bedrooms', 'bathrooms', 'num_photos',
-                'price_per_sqft', 'manager_id', 'building_id', 
-                'display_address', 'street_address']#'school_district_id']
+                'price_per_sqft', 'manager_id', 'building_id', 'num_features',
+                'latitude', 'longitude']#'school_district_id']
     
     # The number of photos
     train_data['num_photos'] = train_data['photos'].apply(len)
@@ -46,6 +46,10 @@ def add_features(train_data, test_data):
     test_data['price_per_sqft'] = test_data['price'] / (1 \
              + test_data['bedrooms'].clip(1,4) \
              + 0.5 * test_data['bathrooms'].clip(0,2))
+    
+    # Number of Features
+    train_data['num_features'] = train_data['features'].apply(len)
+    test_data['num_features'] = test_data['features'].apply(len)
     
     # School district id
     #train_data['school_district_id'] = train_data.apply(lambda x: district(
@@ -123,6 +127,8 @@ boost.dump_model('dump.raw.txt')
 print("Training Complete")
 
 test = xgb.DMatrix(test_data)
+
+ypred_train = boost.predict(train)
 
 ypred = boost.predict(test)
 
