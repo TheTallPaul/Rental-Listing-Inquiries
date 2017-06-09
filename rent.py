@@ -6,6 +6,33 @@ import xgboost as xgb
 
 from sklearn import preprocessing
 
+#using a csv containing the school ids and building ids, builds a dictionary keying the former to the latter
+def dist(file):
+	f = open(file, "r")
+	district = {}
+	i = 1
+	for line in f:
+		control = 0
+		buildID = ""
+		schoolID = ""
+		for i in range (len(line)):
+			if control == 1:
+				buildID += line[i]
+			if control == 2 and line[i] != "\n":
+				schoolID += line[i]
+			if line[i] == ',':
+				control += 1
+		district[buildID] = schoolID
+	return district
+	
+trainDist = dist("schoolDistricts.csv")
+testDist = dist("schoolDistrictsTest.csv")
+
+def keyToDictTrain(key):
+	return trainDist[key]
+def keyToDictTest(key):
+	return testDist[key]
+	
 # Reads the json object as a panda object
 def read_data(train_filepath, test_filepath):
     return pd.read_json(train_filepath), pd.read_json(test_filepath)
@@ -51,11 +78,10 @@ def add_features(train_data, test_data):
     train_data['num_features'] = train_data['features'].apply(len)
     test_data['num_features'] = test_data['features'].apply(len)
     
+	
     # School district id
-    #train_data['school_district_id'] = train_data.apply(lambda x: district(
-           # x['latitude'], x['longitude']), axis=1)
-    #test_data['school_district_id'] = test_data.apply(lambda x: district(
-           # x['latitude'], x['longitude']), axis=1)
+    train_data['school_district_id'] = train_data['building_id'].apply(trainDist)
+    test_data['school_district_id'] = test_data['building_id'].apply(testDist)
     
     remove_unused_features(train_data, test_data, features)
     return features
@@ -138,4 +164,3 @@ out_df = pd.DataFrame(ypred)
 out_df.columns = ["high", "medium", "low"]
 out_df["listing_id"] = test_data.listing_id.values
 out_df.to_csv("coolbros.csv", index=False)
-
